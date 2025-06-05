@@ -4,7 +4,6 @@ from rest_framework.response import Response
 from rest_framework import status
 from .serializers import UsuarioSerializer
 from Usuario.models import Usuario, SesionUsuario
-from Usuario.API.servicios import iniciar_sesion, cerrar_sesion, actualizar_actividad
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
@@ -121,13 +120,13 @@ class LogoutJWTView(APIView):
             )
 
         try:
-            # Convertimos el refresh token en un objeto RefreshToken
+            
             token = RefreshToken(refresh_token)
 
-            # Añadimos el token a la lista negra
+            
             token.blacklist()
 
-            # Marcar todas las sesiones activas del usuario como inactivas
+            
             request.user.sesionusuario_set.update(activa=False)
 
             return Response(
