@@ -9,6 +9,7 @@ from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.permissions import AllowAny
 
 
 @api_view(['POST'])
@@ -65,6 +66,9 @@ def obtener_usuarios(request):
 
 
 class LoginJWTView(APIView):
+    permission_classes = [AllowAny] 
+    authentication_classes = []
+    
     def post(self, request):
         correo = request.data.get('correo')
         password = request.data.get('password')
