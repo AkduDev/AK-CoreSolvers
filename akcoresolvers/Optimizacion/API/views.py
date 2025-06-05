@@ -27,3 +27,26 @@ class MostrarGraficoView(APIView):
             return Response(buf, status=400)
 
         return HttpResponse(buf.getvalue(), content_type="image/png")
+
+
+class ResolverSimplexView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        datos = request.data
+        resultado = resolver_simplex(datos)
+        return Response(resultado)
+
+
+class ChatMathView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        mensaje = request.data.get("mensaje")
+        if not mensaje:
+            return Response({"error": "Falta el campo 'mensaje'"})
+
+        resultado = procesar_entrada(mensaje)
+        return Response(resultado)
