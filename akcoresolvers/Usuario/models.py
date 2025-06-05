@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser, PermissionsMixin
+from django.utils import timezone
 
 class UsuarioManager(BaseUserManager):
     def create_user(self, correo, nombre, apellido, telefono, carne_identidad, password=None):
@@ -52,3 +53,18 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     
     def __str__(self):
         return f"{self.nombre} {self.apellido} ({self.correo})"
+
+
+
+
+class SesionUsuario(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    token = models.CharField(max_length=100, unique=True)  # Token único por sesión
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
+    fecha_inicio = models.DateTimeField(default=timezone.now)
+    ultima_actividad = models.DateTimeField(default=timezone.now)
+    activa = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Sesión de {self.usuario} ({self.fecha_inicio})"

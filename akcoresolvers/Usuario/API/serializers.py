@@ -16,3 +16,9 @@ class UsuarioSerializer(serializers.ModelSerializer):
         usuario.save()
 
         return usuario
+
+
+
+        
+    
+    
