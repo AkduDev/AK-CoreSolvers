@@ -5,6 +5,13 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from Optimizacion.API.servicios import *
 
+#WOLFRAMMMMMMMMMMMMMMMMMMMMMMMM
+from Optimizacion.API.MetodosWolfram import *
+from Optimizacion.API.Wolfram_Alpha import *
+from Optimizacion.API.MetodosWolfram.analisis_distribuciones import resolver_distribucion_wolfram_alpha
+from Optimizacion.API.MetodosWolfram.probabilidades import resolver_probabilidad_wolfram_alpha
+from Optimizacion.API.MetodosWolfram.simulaciones import resolver_simulacion_wolfram_alpha
+
 class ResolverGraficoView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -75,4 +82,41 @@ class ResolverDualSimplexView(APIView):
         if 'error' in resultado:
             return Response(resultado, status=400)
 
+        return Response(resultado)
+
+
+class ResolverProbabilidadView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        mensaje = request.data.get("mensaje")
+        if not mensaje:
+            return Response({"error": "Falta el campo 'mensaje'"})
+
+        resultado = resolver_probabilidad_wolfram_alpha(mensaje)
+        return Response(resultado)
+
+class ResolverSimulacionView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        mensaje = request.data.get("mensaje")
+        if not mensaje:
+            return Response({"error": "Falta el campo 'mensaje'"})
+
+        resultado = resolver_simulacion_wolfram_alpha(mensaje)
+        return Response(resultado)
+
+class ResolverDistribucionView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        mensaje = request.data.get("mensaje")
+        if not mensaje:
+            return Response({"error": "Falta el campo 'mensaje'"})
+
+        resultado = resolver_distribucion_wolfram_alpha(mensaje)
         return Response(resultado)
