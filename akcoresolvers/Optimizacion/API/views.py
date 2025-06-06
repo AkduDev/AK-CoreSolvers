@@ -29,14 +29,7 @@ class MostrarGraficoView(APIView):
         return HttpResponse(buf.getvalue(), content_type="image/png")
 
 
-class ResolverSimplexView(APIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        datos = request.data
-        resultado = resolver_simplex(datos)
-        return Response(resultado)
 
 
 class ChatMathView(APIView):
@@ -49,4 +42,37 @@ class ChatMathView(APIView):
             return Response({"error": "Falta el campo 'mensaje'"})
 
         resultado = procesar_entrada(mensaje)
+        return Response(resultado)
+
+
+class ResolverSimplexView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        datos = request.data
+        resultado = resolver_simplex(datos)
+
+        # Debugging: Imprimir el resultado recibido
+        print("Resultado en ResolverSimplexView:", resultado)
+
+        if 'error' in resultado:
+            return Response(resultado, status=400)
+
+        return Response(resultado)
+
+class ResolverDualSimplexView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        datos = request.data
+        resultado = resolver_dual_simplex(datos)
+
+        # Debugging: Imprimir el resultado recibido
+        print("Resultado en ResolverDualSimplexView:", resultado)
+
+        if 'error' in resultado:
+            return Response(resultado, status=400)
+
         return Response(resultado)

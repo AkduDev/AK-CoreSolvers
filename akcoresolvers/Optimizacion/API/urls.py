@@ -6,4 +6,6 @@ urlpatterns = [
     path('graficomostrar/', MostrarGraficoView.as_view(), name='mostrar_grafico'),
     path('simplex/', ResolverSimplexView.as_view(), name='resolver_simplex'),
     path('chat/', ChatMathView.as_view(), name='chat_math'),
+    path('dualsimplex/',ResolverSimplexView.as_view(),name='dualsimplex'),
+    
 ]

@@ -9,6 +9,7 @@ from sympy import symbols, Eq, solve, diff, integrate, factor, apart, simplify, 
 from sympy.parsing.latex import parse_latex
 import re
 
+
 def resolver_grafico(datos):
     if len(datos["funcion_objetivo"]["coeficientes"]) != 2:
         return {"error": "El método gráfico solo funciona con 2 variables"}
@@ -99,99 +100,111 @@ def generar_grafico(datos):
 
 
 def resolver_simplex(datos):
-    
+    """
+    Resuelve un problema de PL usando el método Simplex y devuelve:
+    - Solución óptima
+    - Resultados en formato JSON
+    """
+    # Debugging: Imprimir los datos recibidos
+    print("Datos recibidos en resolver_simplex:", datos)
+
     # Validaciones básicas
     if 'funcion_objetivo' not in datos:
         return {"error": "Falta la función objetivo"}
-
+    
     if 'coeficientes' not in datos['funcion_objetivo']:
         return {"error": "La función objetivo debe tener coeficientes"}
-
+    
     if 'restricciones' not in datos or not isinstance(datos['restricciones'], list):
         return {"error": "Las restricciones deben ser una lista"}
-
+    
+    if 'lado_derecho' not in datos or not isinstance(datos['lado_derecho'], list):
+        return {"error": "El lado derecho de las restricciones debe ser una lista"}
+    
     num_vars = len(datos["funcion_objetivo"]["coeficientes"])
     if num_vars < 1:
         return {"error": "La función objetivo debe tener al menos una variable"}
+    
+    num_restricciones = len(datos["restricciones"])
+    if num_restricciones != len(datos["lado_derecho"]):
+        return {"error": "El número de restricciones debe coincidir con el número de valores del lado derecho"}
+    
+    A = []
+    b = []
+    bounds = [(0, None)] * num_vars  # Por defecto, variables no negativas
 
-    for r in datos["restricciones"]:
-        if len(r["coeficientes"]) != num_vars:
+    for r, valor in zip(datos["restricciones"], datos["lado_derecho"]):
+        coef = r["coeficientes"]
+        signo = r["signo"]
+
+        if len(coef) != num_vars:
             return {"error": f"Todas las restricciones deben tener {num_vars} variables"}
-        if r["signo"] not in ['<=', '=', '>=']:
+
+        if signo == "<=":
+            A.append(coef)
+            b.append(valor)
+        elif signo == ">=":
+            A.append([-c for c in coef])  # Cambiamos el signo y los coeficientes
+            b.append(-valor)
+        elif signo == "=":
+            A.append(coef)
+            b.append(valor)
+        else:
             return {"error": "Signo de restricción inválido. Use <=, = o >="}
 
     # Preparar función objetivo
     c = np.array(datos["funcion_objetivo"]["coeficientes"], dtype=float)
+
+    # Convertir maximización a minimización (por defecto linprog minimiza)
     is_max = datos["funcion_objetivo"].get("tipo", "min").lower() == "max"
     if is_max:
-        c = -c  # Invertimos para maximización
+        c = -c  # Invertimos para maximizar
 
-    # Restricciones
-    A_ub = []
-    b_ub = []
-    A_eq = []
-    b_eq = []
-
-    for r in datos["restricciones"]:
-        coefs = np.array(r["coeficientes"], dtype=float)
-        val = float(r["valor"])
-
-        if r["signo"] == "<=":
-            A_ub.append(coefs)
-            b_ub.append(val)
-        elif r["signo"] == ">=":
-            A_ub.append(-coefs)
-            b_ub.append(-val)
-        elif r["signo"] == "=":
-            A_eq.append(coefs)
-            b_eq.append(val)
-
-    # Límites de variables
-    bounds = [(0, None)] * num_vars
-
-    # Resolver problema
+    # Resolver problema con método Simplex
     try:
-        resultado = linprog(c, A_ub=A_ub or None, b_ub=b_ub or None,
-                            A_eq=A_eq or None, b_eq=b_eq or None,
-                            bounds=bounds, method='highs')
+        resultado = linprog(c, A_ub=A, b_ub=b, bounds=bounds, method='highs')
     except Exception as e:
         return {"error": f"Error interno al resolver el problema: {str(e)}"}
 
     # Interpretar resultados
     if resultado.success:
         solucion = {
+            "success": True,
             "mensaje": "Solución óptima encontrada",
             "z_optimo": round(-resultado.fun if is_max else resultado.fun, 4),
             "variables": {f"x{i+1}": round(valor, 4) for i, valor in enumerate(resultado.x)},
             "estado": "Óptimo"
         }
     elif resultado.status == 2:
-        solucion = {"mensaje": "El problema no tiene solución factible (infeasible)"}
+        solucion = {
+            "success": False,
+            "mensaje": "El problema no tiene solución factible (infeasible)",
+            "estado": "No Óptimo",
+            "detalle": str(resultado)
+        }
     elif resultado.status == 3:
-        solucion = {"mensaje": "El problema es ilimitado (unbounded)"}
+        solucion = {
+            "success": False,
+            "mensaje": "El problema es ilimitado (unbounded)",
+            "estado": "No Óptimo",
+            "detalle": str(resultado)
+        }
     elif resultado.status == 4:
-        solucion = {"mensaje": "Problema ilimitado o sin solución clara"}
+        solucion = {
+            "success": False,
+            "mensaje": "Problema ilimitado o sin solución clara",
+            "estado": "No Óptimo",
+            "detalle": str(resultado)
+        }
     else:
-        solucion = {"mensaje": "No se pudo encontrar una solución óptima", "detalle": str(resultado)}
-
-    # Generar CSV solo si hay solución
-    if resultado.success:
-        # Crear CSV en memoria
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(["Variable", "Valor"])
-
-        for var, valor in solucion["variables"].items():
-            writer.writerow([var, valor])
-
-        writer.writerow(["Z óptimo", solucion["z_optimo"]])
-
-        # Codificar CSV como Base64 para enviarlo en JSON
-        csv_data = output.getvalue()
-        solucion["archivo_csv"] = base64.b64encode(csv_data.encode()).decode('utf-8')
+        solucion = {
+            "success": False,
+            "mensaje": "No se pudo encontrar una solución óptima",
+            "estado": "No Óptimo",
+            "detalle": str(resultado)
+        }
 
     return solucion
-
 
 # CHATTTTTTTTTTTTTTTTTTTTTTTTTT CHATTTTTTTTTTTTTTTTTTTTTTTTTTTTT
 
@@ -463,3 +476,114 @@ def procesar_expresion(entrada):
         }
     except Exception as e:
         return {"error": f"No se pudo procesar la expresión: {str(e)}"}
+
+
+
+def resolver_dual_simplex(datos):
+    """
+    Resuelve un problema de PL usando el Método Dual Simplex y devuelve:
+    - Solución óptima
+    - Resultados en formato JSON
+    """
+    # Debugging: Imprimir los datos recibidos
+    print("Datos recibidos en resolver_dual_simplex:", datos)
+
+    # Validar estructura básica
+    if 'funcion_objetivo' not in datos:
+        return {"error": "Falta la función objetivo"}
+    
+    if 'coeficientes' not in datos['funcion_objetivo']:
+        return {"error": "La función objetivo debe tener coeficientes"}
+    
+    if 'restricciones' not in datos or not isinstance(datos['restricciones'], list):
+        return {"error": "Las restricciones deben ser una lista"}
+    
+    if 'lado_derecho' not in datos or not isinstance(datos['lado_derecho'], list):
+        return {"error": "El lado derecho de las restricciones debe ser una lista"}
+    
+    # Validar número de variables
+    num_vars = len(datos["funcion_objetivo"]["coeficientes"])
+    if num_vars < 1:
+        return {"error": "La función objetivo debe tener al menos una variable"}
+    
+    # Validar cada restricción
+    num_restricciones = len(datos["restricciones"])
+    if num_restricciones != len(datos["lado_derecho"]):
+        return {"error": "El número de restricciones debe coincidir con el número de valores del lado derecho"}
+    
+    A = []
+    b = []
+    bounds = [(0, None)] * num_vars  # Por defecto, variables no negativas
+    
+    for r, valor in zip(datos["restricciones"], datos["lado_derecho"]):
+        coef = r["coeficientes"]
+        signo = r["signo"]
+        
+        if len(coef) != num_vars:
+            return {"error": f"Todas las restricciones deben tener {num_vars} variables"}
+        
+        if signo == "<=":
+            A.append(coef)
+            b.append(valor)
+        elif signo == ">=":
+            A.append([-c for c in coef])  # Cambiamos el signo y los coeficientes
+            b.append(-valor)
+        elif signo == "=":
+            A.append(coef)
+            b.append(valor)
+        else:
+            return {"error": "Signo de restricción inválido. Use <=, = o >="}
+    
+    # Preparar función objetivo
+    c = np.array(datos["funcion_objetivo"]["coeficientes"], dtype=float)
+    
+    # Convertir maximización a minimización (por defecto linprog minimiza)
+    is_max = datos["funcion_objetivo"].get("tipo", "min").lower() == "max"
+    if is_max:
+        c = -c  # Invertimos para maximizar
+    
+    # Resolver problema con método Dual Simplex
+    try:
+        resultado = linprog(c, A_ub=A, b_ub=b, bounds=bounds, method='highs-ds')
+    except Exception as e:
+        return {"error": f"Error interno al resolver el problema: {str(e)}"}
+    
+    # Interpretar resultados
+    if resultado.success:
+        solucion = {
+            "success": True,
+            "mensaje": "Solución óptima encontrada",
+            "z_optimo": round(-resultado.fun if is_max else resultado.fun, 4),
+            "variables": {f"x{i+1}": round(valor, 4) for i, valor in enumerate(resultado.x)},
+            "estado": "Óptimo"
+        }
+    elif resultado.status == 2:
+        solucion = {
+            "success": False,
+            "mensaje": "El problema no tiene solución factible (infeasible)",
+            "estado": "No Óptimo",
+            "detalle": str(resultado)
+        }
+    elif resultado.status == 3:
+        solucion = {
+            "success": False,
+            "mensaje": "El problema es ilimitado (unbounded)",
+            "estado": "No Óptimo",
+            "detalle": str(resultado)
+        }
+    elif resultado.status == 4:
+        solucion = {
+            "success": False,
+            "mensaje": "Problema ilimitado o sin solución clara",
+            "estado": "No Óptimo",
+            "detalle": str(resultado)
+        }
+    else:
+        solucion = {
+            "success": False,
+            "mensaje": "No se pudo encontrar una solución óptima",
+            "estado": "No Óptimo",
+            "detalle": str(resultado)
+        }
+    
+    return solucion
